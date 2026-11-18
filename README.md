@@ -38,32 +38,32 @@ as fewer watts and lower temps with identical tokens/sec.
 | Card | Board | PCI | VBIOS | Role |
 |------|-------|-----|-------|------|
 | RTX 3090 2-fan | Dell OEM (subvendor 1028:3880) | 08:00.0 | 94.02.26.80.80 | bottom slot, cooling limited |
-| RTX 3090 3-fan | Gigabyte (subvendor 1458:4043) | 07:00.0 | 94.02.26.88.3C | top slot |
+| RTX 3090 | ASUS (subvendor 1043:87AF) | 07:00.0 | 94.02.42.00.A9 | top slot, best bins of the three tried |
 
 - Driver 595.84, kernel 7.0.14-19-pve (Proxmox VE), headless host.
 - The bottom card exhausts into the top card's intake, so the top card is the
-  one that runs hot. In practice the Dell on the bottom showed the
-  higher temps on its weaker 2-fan cooler, which is why it runs the deepest
-  crown (lower settle clock and voltage) and the 3-fan Gigabyte gets a slightly
-  lighter crown.
+  one that runs hot in theory. In practice the Dell on the bottom showed the
+  higher temps on its weaker 2-fan cooler, so it is capped to the lower settle
+  clock. The ASUS on top has the best bins of the three cards tried and holds
+  a higher settle clock at an even lower voltage.
 - Workload: vLLM, tensor parallel over both cards, MTP speculative decoding,
   long agentic contexts, decode is memory bandwidth bound, prefill is compute
   heavy and is where the unlock pays.
 
 ## Results
 
-| Metric | Dell (bottom) | Gigabyte (top) |
-|--------|---------------|----------------|
-| Load voltage | 737 mV | 750 mV |
-| Load clock | 1590-1605 MHz, pinned | 1605-1620 MHz, pinned |
-| Load power | 245-268 W | 264-272 W |
-| Load temp | 66-74 C | 65-74 C |
-| Idle power / temp / fan | 14 W / 33 C / 32 percent | 29 W / 41 C / 0 percent |
+| Metric | Dell (bottom) | ASUS (top) |
+|--------|---------------|------------|
+| Load voltage | 737 mV | 731 mV |
+| Load clock | 1590-1605 MHz, pinned | 1650 MHz, pinned |
+| Load power | 245-268 W | 260-265 W |
+| Load temp | 66-74 C | 68-69 C |
+| Idle power / temp | 23 W / 39 C | 24 W / 41 C |
 
 Context for those numbers:
 
-- At these clocks the stock curve pairs are roughly 820-825 mV, so both cards
-  now run about 9-11 percent below stock voltage at the same clock.
+- At these clocks the stock curve pairs are roughly 825-860 mV, so both cards
+  run 9-14 percent below stock voltage at the same clock.
 - Before tuning, the cards chased the stock curve at 345 W class and 74-79 C
   while power limiting. Now the same decode does 245-272 W and tokens/sec is
   unchanged because decode is bandwidth bound. Prefill keeps most of the
@@ -83,7 +83,7 @@ Never replay an old offset map blindly, the driver rebases the curve each
 boot, so generate from the current snapshot:
 
 ```bash
-ID=10DE:2204-1458:4043-0000:07:00.0   # or the 1028 card
+ID=10DE:2204-1043:87AF-0000:07:00.0   # or the 1028 card
 TARGET=1605                            # settle clock
 FLOOR=1400                             # first stock point raised to TARGET
 
@@ -114,18 +114,24 @@ journalctl -k --no-pager | grep -i xid
 
 Known behaviors documented along the way:
 
+- One vLLM crash mid session with Xid 13 "Out Of Range Address" plus Xid 43 on
+  the previous top card (Gigabyte) while crowned, right where the MTP draft
+  attention metadata is built. Stock ran clean, so attribution between vLLM
+  bug and marginal undervolt stayed open, and that card has since been
+  replaced with the ASUS. If Xid 13 repeats on the current setup, raise FLOOR
+  (1400 to 1500) or drop that card to a plain flatten (no raised points).
 - Per-clock NVLM offsets alone (`gpu_clock_offsets`) act as underclocking on a
   power capped workload, not undervolting, so this setup went the curve route.
 - OEM cooler note: the Dell 2-fan card sits at its cooler's equilibrium no
-  matter what point it gets, hence it carries the deeper crown while the
-  3-fan Gigabyte takes a slightly lighter one. The copper-limited bottom card
-  sets the pace for both.
+  matter what point it gets, so it is capped to the lower settle clock. The
+  copper-limited bottom card sets the pace for both.
 
 ## Files in this repo
 
 - `etc/lact/config.yaml`, fan curves plus both crowned maps, drop in at
   `/etc/lact/config.yaml`, `systemctl restart lactd`
-- `gb_crown.txt` / `dell_crown2.txt` generated crown offset maps
+- `dell_crown2.txt` / `asus_crown.txt` generated crown offset maps
+  (`gb_crown.txt` belongs to the replaced Gigabyte, kept for reference)
 - See also
   [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) for the tensor
   unlock this is stacked on
