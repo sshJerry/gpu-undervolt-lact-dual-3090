@@ -114,12 +114,6 @@ journalctl -k --no-pager | grep -i xid
 
 Known behaviors documented along the way:
 
-- One vLLM crash mid session with Xid 13 "Out Of Range Address" plus Xid 43 on
-  the previous top card (Gigabyte) while crowned, right where the MTP draft
-  attention metadata is built. Stock ran clean, so attribution between vLLM
-  bug and marginal undervolt stayed open, and that card has since been
-  replaced with the ASUS. If Xid 13 repeats on the current setup, raise FLOOR
-  (1400 to 1500) or drop that card to a plain flatten (no raised points).
 - Per-clock NVLM offsets alone (`gpu_clock_offsets`) act as underclocking on a
   power capped workload, not undervolting, so this setup went the curve route.
 - OEM cooler note: the Dell 2-fan card sits at its cooler's equilibrium no
